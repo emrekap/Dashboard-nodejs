@@ -13,7 +13,7 @@ var port = process.env.PORT || 3000;
 app.engine('hbs', hbs({extname:'hbs',defaultLayout:'layout', layoutsDir: __dirname + '/views/layouts/'}));
 app.set('views',path.join(__dirname, 'views'));
 app.set('view engine', 'hbs');
-//app.set('assets',path.join(__dirname, 'assets'));
+
 
 //Render Page Requests and Responses
 app.use(bodyparser.json());
