@@ -1,0 +1,318 @@
+<div id="container" class="container">
+  <div class="row">
+    <div class="date col-sm-12">
+    <div class="top-menu">
+      <div class="calender">Start Date: <input type="text" id="startDate"></div>
+      <div class="calender">End Date: <input type="text" id="endDate"></div>
+      <div class="button" style="float: left;"><button id="betweenBtn" class="btn btn-primary">Get</button></div>
+    </div>
+      <div id="btns" class="button">
+        <button id="show-today" class="btn btn-info">Show Today</button>
+        <button id="collect" class="btn btn-info" style="background-color: #7a779b;">Only Collect</button>
+        <button id="insert" class="btn btn-info" style="background-color: #1b9e77;">Only Insert</button>
+        <button id="back" class="btn btn-warning">Main Page</button>
+      </div>
+      <div id="total-counts" style="margin-left: 10px; margin-top: 10px;">
+        <table>
+          <tr>
+            <td style="color:#1b9e77"><b>Insert Count:</b> </td>
+            <td id="insert-count"></td>
+          </tr>
+          <tr>
+            <td style="color: #7a779b"><b>Collect Count:</b> </td>
+            <td id="collect-count"></td>
+          </tr>
+        </table>
+      </div>
+    </div>
+    <div class="col-sm-12 row">
+      <div id="dashboard_div" style="margin: 0 auto">
+        <div id="control_div" class="control"></div>
+        <div id="chart_div"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script language="JavaScript">
+  // Load the Visualization API and the controls package.
+  google.charts.load('current', { 'packages': ['corechart', 'controls'] });
+  google.charts.load('current', { 'packages': ['bar'] });
+
+  // Set a callback to run when the Google Visualization API is loaded.
+  google.charts.setOnLoadCallback(drawDashboard);
+
+  var startDate = null;
+  var endDate = null;
+  var isFirstload = true;
+  var interval = null;
+
+  function drawDashboard() {
+    var dashboard = new google.visualization.Dashboard(document.getElementById('dashboard_div'));
+    var data = new google.visualization.DataTable();
+    var collectData = new google.visualization.DataTable();
+    var insertData = new google.visualization.DataTable();
+    var collectList = [];
+    var insertList = [];
+
+    collectData.addColumn("string", "Name");
+    collectData.addColumn("number", "Collect");
+
+    insertData.addColumn("string", "Name");
+    insertData.addColumn("number", "Shelf Insert");
+
+    data.addColumn("string", "Name");
+    data.addColumn("number", "Shelf Insert");
+    data.addColumn("number", "Collect");
+
+    $('#collect').click(function () {
+      dashboard.bind(control, collect_chart_options);
+      dashboard.draw(collectData);
+    });
+
+    $('#insert').click(function () {
+      dashboard.bind(control, insert_chart_options);
+      dashboard.draw(insertData);
+    });
+
+    var control = new google.visualization.ControlWrapper({
+      containerId: 'control_div',
+      controlType: 'CategoryFilter',
+      options: {
+        filterColumnIndex: 0,
+        ui: {
+          'labelStacking': 'vertical',
+        }
+      }
+    });
+    //Main chart options
+    var col_chart = new google.visualization.ChartWrapper({
+      containerId: 'chart_div',
+      chartType: 'ColumnChart',
+      options: {
+        title: 'Collect/Insert Count Track',
+        height: 550,
+        width: 1140,
+        colors: ['#1b9e77', '#7a779b']
+      }
+    });
+    //Collect from shelf and Insert to shelf options
+    var insert_chart_options = new google.visualization.ChartWrapper({
+      containerId: 'chart_div',
+      chartType: 'ColumnChart',
+      options: {
+        title: 'Collect/Insert Count Track',
+        height: 550,
+        width: 1140,
+        colors: ['#1b9e77']
+      }
+    });
+    var collect_chart_options = new google.visualization.ChartWrapper({
+      containerId: 'chart_div',
+      chartType: 'ColumnChart',
+      options: {
+        title: 'Collect/Insert Count Track',
+        height: 550,
+        width: 1140,
+        colors: ['#7a779b']
+      }
+    });
+
+    if (isFirstload) {
+
+      var jsonData = $.ajax({
+        url: "/api/employee/collectinsert",
+        dataType: "json",
+        async: false,
+        success: function (jsonData) {
+          var collectInsertList = $.map(jsonData, function (el) { return el });
+
+          collectInsertList.sort(function (a, b) {
+            return (b.collect_book_count + b.insert_to_shelf_count) - (a.collect_book_count + a.insert_to_shelf_count);
+          });
+          collectInsertList.forEach(function (item) {
+            seperateLists(item);
+            if (item.collect_book_count > 0 || item.insert_to_shelf_count > 0) {
+              data.addRow([item.name, item.insert_to_shelf_count, item.collect_book_count]);
+            }
+          });
+
+          collectList.sort(function (a, b) {
+            return b.collect_book_count - a.collect_book_count;
+          });
+          collectList.forEach(function (item) {
+            collectData.addRow([item.name, item.collect_book_count]);
+          });
+
+          insertList.sort(function (a, b) {
+            return b.insert_to_shelf_count - a.insert_to_shelf_count;
+          });
+          insertList.forEach(function (item) {
+            insertData.addRow([item.name, item.insert_to_shelf_count]);
+          });
+
+          document.getElementById("collect-count").innerHTML = sumArr(collectList, "c");
+          document.getElementById("insert-count").innerHTML = sumArr(insertList, "i");
+          //Draw Chart
+          dashboard.bind(control, col_chart);
+          dashboard.draw(data);
+        }
+      });
+    }
+    else {
+      clearInterval(this.interval);
+      var jsonData = $.ajax({
+        url: "/api/employee/collectinsert/" + startDate + "/" + endDate,
+        dataType: "json",
+        async: false,
+        success: function (jsonData) {
+          var collectInsertList = $.map(jsonData, function (el) { return el });
+          var totalArr = [];
+          var userList = getUserList();
+
+          collectInsertList.forEach(function (dailyList) {
+            collectInsertDate(dailyList);
+          });
+
+          function collectInsertDate(dailyCollectInsertList) {
+            userList.forEach(function (userId) {
+              collectInsertUser(userId, dailyCollectInsertList.users);
+            });
+          }
+
+          function collectInsertUser(userId, dailyCollectInsertUserList) {
+            dailyCollectInsertUserList.forEach(function (user) {
+              if (userId == user.user_id) {
+                sumUserCollectInsert(user);
+              }
+
+            });
+          }
+
+          function sumUserCollectInsert(user) {
+            var isUserFound = false;
+            totalArr.forEach(function (part, index, theArray) {
+              var item = theArray[index];
+              if (item.user_id == user.user_id) {
+                theArray[index].insert_to_shelf_count += user.insert_to_shelf_count;
+                theArray[index].collect_book_count += user.collect_book_count;
+                isUserFound = true;
+              }
+            });
+
+            if (!isUserFound) {
+              totalArr.push(user);
+            }
+          }
+
+          totalArr.sort(function (a, b) {
+            return (b.collect_book_count + b.insert_to_shelf_count) - (a.collect_book_count + a.insert_to_shelf_count);
+          });
+          totalArr.forEach(function (item) {
+            seperateLists(item);
+            if (item.collect_book_count > 0 || item.insert_to_shelf_count > 0) {
+              data.addRow([item.name, item.insert_to_shelf_count, item.collect_book_count]);
+            }
+          });
+
+          collectList.sort(function (a, b) {
+            return b.collect_book_count - a.collect_book_count;
+          });
+          collectList.forEach(function (item) {
+            collectData.addRow([item.name, item.collect_book_count]);
+          });
+
+          insertList.sort(function (a, b) {
+            return b.insert_to_shelf_count - a.insert_to_shelf_count;
+          });
+          insertList.forEach(function (item) {
+            insertData.addRow([item.name, item.insert_to_shelf_count]);
+          });
+
+          document.getElementById("collect-count").innerHTML = sumArr(collectList, "c");
+          document.getElementById("insert-count").innerHTML = sumArr(insertList, "i");
+
+          //Draw Chart
+          dashboard.bind(control, col_chart);
+          dashboard.draw(data);
+        }
+      });
+    }
+    function seperateLists(item) {
+      if (item.collect_book_count > 0 && item.insert_to_shelf_count > 0) {
+        collectList.push(item);
+        insertList.push(item);
+      }else if (item.insert_to_shelf_count > 0 && item.collect_book_count == 0) {
+        insertList.push(item);
+      }else if (item.collect_book_count > 0 && item.insert_to_shelf_count == 0) {
+        collectList.push(item);
+      }
+      
+    }
+    function sumArr(array, param) {
+      var total = 0;
+      if (param == "c") {
+        array.forEach(function (item) {
+          total += item.collect_book_count;
+        });
+        return total;
+      }
+      if (param == "i") {
+        array.forEach(function (item) {
+          total += item.insert_to_shelf_count;
+        });
+        return total;
+      }
+    }
+
+  }
+
+  $(document).ready(function () {
+    //interval = setInterval(function(){drawDashboard();}, 2000);
+    
+    //Datepickers
+    $('#startDate').datepicker({
+      dateFormat: 'yy-mm-dd',
+      onSelect: function () {
+        startDate = this.value;
+        var enddt = $('#endDate');
+        var minDate = $(this).datepicker('getDate');
+        enddt.datepicker('option', 'minDate', minDate);
+        endDate = this.value;
+      },
+      maxDate: new Date,
+
+    });
+    $('#endDate').datepicker({
+      dateFormat: 'yy-mm-dd',
+      onSelect: function () {
+        endDate = this.value;
+      },
+      maxDate: new Date
+    });
+    //Buttons
+    $('#betweenBtn').click(function () {
+      isFirstload = false;
+      clearInterval(interval);
+      if ((startDate == null && endDate == null) || (startDate == getCurrDate() && endDate == getCurrDate())) {
+        isFirstload = true;
+        //interval = setInterval(function(){drawDashboard();}, 2000);
+      }
+      drawDashboard();
+    });
+
+    $('#show-today').click(function () {
+      isFirstload = true;
+      $('#startDate').val(getCurrDate());
+      $('#endDate').val(getCurrDate());
+      startDate = getCurrDate();
+      endDate = getCurrDate();
+      drawDashboard();
+    });
+
+    $('#back').click(function () {
+      window.location.replace("/");
+    });
+
+  });
+
+</script>

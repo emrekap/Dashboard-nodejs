@@ -1,0 +1,46 @@
+<div id="container" style="margin: 0 auto"></div> 
+
+
+<script type="text/javascript">
+google.charts.load('current', {'packages':['bar']});
+google.charts.setOnLoadCallback(drawChart);
+
+function drawChart() {
+  var jsonData = $.ajax({
+        url: "/api/employee/collectinsert",
+        dataType: "json",
+        async: false,
+        success:function(jsonData){
+          var data = new google.visualization.DataTable();
+          var collectInsertList = $.map(jsonData, function(el) { return el });
+
+          collectInsertList.sort(function (a, b) {
+            return (b.collect_book_count + b.insert_to_shelf_count) - (a.collect_book_count +a.insert_to_shelf_count );
+          });
+          
+          var newArr = collectInsertList.slice(0,5);
+          data.addColumn("string", "Name");
+          data.addColumn("number", "Shelf Insert");
+          data.addColumn("number", "Collect");
+          newArr.forEach(function(item){
+            data.addRow([item.name, item.insert_to_shelf_count, item.collect_book_count]);
+          });
+          
+          var options = {
+            title: 'Collect/Insert Count Track',
+            width: '600', 
+            height: '500' 
+          };
+
+          var BarChart = new google.visualization.BarChart(document.getElementById('container'));
+          BarChart.draw(data, options);
+        } 
+    });
+   
+}
+
+$( "#container" ).dblclick(function() {
+    window.location.replace("/employee/detail");
+});
+
+</script>

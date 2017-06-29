@@ -1,0 +1,20 @@
+{
+  "name": "gooogle_chart",
+  "version": "1.0.0",
+  "description": "Dashboard with Google Charts",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "ekaplan",
+  "license": "ISC",
+  "dependencies": {
+    "body-parser": "^1.17.2",
+    "couchbase": "^2.3.4",
+    "express": "^4.15.3",
+    "express-handlebars": "^3.0.0",
+    "moment": "^2.18.1",
+    "morgan": "~1.8.1",
+    "serve-favicon": "^2.4.3"
+  }
+}
